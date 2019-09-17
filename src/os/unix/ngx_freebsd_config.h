@@ -49,6 +49,8 @@
 #include <osreldate.h>
 #include <sys/sysctl.h>
 
+#include <dlfcn.h>
+
 
 #if __FreeBSD_version < 400017
 
@@ -86,9 +88,15 @@
 #endif
 
 
-#if (NGX_HAVE_FILE_AIO || NGX_HAVE_AIO)
+#if (NGX_HAVE_FILE_AIO)
+
 #include <aio.h>
 typedef struct aiocb  ngx_aiocb_t;
+
+#if (__FreeBSD_version < 700005 && !defined __DragonFly__)
+#define sival_ptr     sigval_ptr
+#endif
+
 #endif
 
 
@@ -99,12 +107,6 @@ typedef struct aiocb  ngx_aiocb_t;
 #define NGX_KEEPALIVE_FACTOR      1000
 #endif
 
-
-#if (__FreeBSD_version < 430000 || __FreeBSD_version < 500012)
-
-pid_t rfork_thread(int flags, void *stack, int (*func)(void *arg), void *arg);
-
-#endif
 
 #ifndef IOV_MAX
 #define IOV_MAX   1024
