@@ -40,7 +40,7 @@ ngx_int_t ngx_dubbo_hessian2_encode_str(ngx_pool_t *pool, ngx_str_t *in, ngx_str
         out->len = str.length();
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
@@ -74,7 +74,7 @@ ngx_int_t ngx_dubbo_hessian2_encode_map(ngx_pool_t *pool, ngx_array_t *in, ngx_s
         out->len = str.length();
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
@@ -116,7 +116,7 @@ ngx_int_t ngx_dubbo_hessian2_encode_payload_map(ngx_pool_t *pool, ngx_array_t *i
         out->len = str.length();
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, pool->log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {
@@ -158,7 +158,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
 
         for (Map::data_type::iterator it = dmap.begin(); it != dmap.end(); it++) {
             String *sKey = (String*)it->first;
-            String *sValue = NULL;
+            Object *oValue = NULL;
             ByteArray *bValue = NULL;
 
             kv = (ngx_keyval_t*)ngx_array_push(pres);
@@ -167,7 +167,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
             }
             if (sKey) {
                 string p = sKey->to_string();
-                kv->key.data = (u_char*)ngx_palloc(pool, sKey->size());
+                kv->key.data = (u_char*)ngx_palloc(pool, p.length());
                 if (kv->key.data == NULL) {
                     return NGX_ERROR;
                 }
@@ -177,13 +177,13 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
                 if (0 == p.compare("body")) {
                     bValue = (ByteArray*)it->second;
                 } else {
-                    sValue = (String*)it->second;
+                    oValue = it->second;
                 }
             }
 
-            if (sValue) {
-                string p = sValue->to_string();
-                kv->value.data = (u_char*)ngx_palloc(pool, sValue->size());
+            if (oValue) {
+                string p = oValue->to_string();
+                kv->value.data = (u_char*)ngx_palloc(pool, p.length());
                 if (kv->value.data == NULL) {
                     return NGX_ERROR;
                 }
@@ -193,7 +193,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
 
             if (bValue) {
                 string p = bValue->to_string();
-                kv->value.data = (u_char*)ngx_palloc(pool, bValue->size());
+                kv->value.data = (u_char*)ngx_palloc(pool, p.length());
                 if (kv->value.data == NULL) {
                     return NGX_ERROR;
                 }
@@ -203,7 +203,7 @@ ngx_dubbo_hessian2_decode_payload_map(ngx_pool_t *pool, ngx_str_t *in, ngx_array
         }
 
         return NGX_OK;
-    } catch (io_exception e) {
+    } catch (io_exception &e) {
         ngx_log_error(NGX_LOG_ERR, log, 0, "dubbo: parse exception failed %s", e.what());
         return NGX_ERROR;
     } catch (...) {

@@ -29,12 +29,9 @@ use Test::Nginx;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http proxy http_ssl/)->has_daemon('openssl')
+my $t = Test::Nginx->new()->has(qw/http proxy http_ssl socket_ssl/)
+	->has_daemon('openssl')
 	->write_file_expand('nginx.conf', <<'EOF')->plan(30);
 
 %%TEST_GLOBALS%%
@@ -72,7 +69,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]

@@ -25,7 +25,7 @@ static char *ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 static char *ngx_stream_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd,
     void *conf);
 #endif
@@ -109,7 +109,7 @@ static ngx_command_t  ngx_stream_core_commands[] = {
       offsetof(ngx_stream_core_srv_conf_t, preread_timeout),
       NULL },
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     { ngx_string("server_name"),
       NGX_STREAM_SRV_CONF|NGX_CONF_1MORE,
       ngx_stream_core_server_name,
@@ -398,7 +398,7 @@ ngx_stream_core_create_main_conf(ngx_conf_t *cf)
     cmcf->variables_hash_max_size = NGX_CONF_UNSET_UINT;
     cmcf->variables_hash_bucket_size = NGX_CONF_UNSET_UINT;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     cmcf->server_names_hash_max_size = NGX_CONF_UNSET_UINT;
     cmcf->server_names_hash_bucket_size = NGX_CONF_UNSET_UINT;
 #endif
@@ -415,7 +415,7 @@ ngx_stream_core_init_main_conf(ngx_conf_t *cf, void *conf)
     ngx_conf_init_uint_value(cmcf->variables_hash_max_size, 1024);
     ngx_conf_init_uint_value(cmcf->variables_hash_bucket_size, 64);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_conf_init_uint_value(cmcf->server_names_hash_max_size, 512);
     ngx_conf_init_uint_value(cmcf->server_names_hash_bucket_size,
                              ngx_cacheline_size);
@@ -457,7 +457,7 @@ ngx_stream_core_create_srv_conf(ngx_conf_t *cf)
     cscf->preread_buffer_size = NGX_CONF_UNSET_SIZE;
     cscf->preread_timeout = NGX_CONF_UNSET_MSEC;
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     if (ngx_array_init(&cscf->server_names, cf->temp_pool, 4,
                        sizeof(ngx_stream_server_name_t))
         != NGX_OK)
@@ -475,7 +475,7 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
 {
     ngx_stream_core_srv_conf_t *prev = parent;
     ngx_stream_core_srv_conf_t *conf = child;
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     ngx_str_t                   name;
     ngx_stream_server_name_t   *sn;
 #endif
@@ -528,7 +528,7 @@ ngx_stream_core_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_msec_value(conf->preread_timeout,
                               prev->preread_timeout, 30000);
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
     if (conf->server_names.nelts == 0) {
         /* the array has 4 empty preallocated elements, so push cannot fail */
         sn = ngx_array_push(&conf->server_names);
@@ -653,7 +653,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ngx_str_t                    *value, size;
     ngx_url_t                     u;
     ngx_uint_t                    i, n, backlog;
-    ngx_stream_listen_t          *ls, *als;
+    ngx_stream_listen_t          *ls, *als, *nls;
     ngx_stream_core_main_conf_t  *cmcf;
 
     cscf->listen = 1;
@@ -677,7 +677,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     cmcf = ngx_stream_conf_get_module_main_conf(cf, ngx_stream_core_module);
 
-    ls = ngx_array_push_n(&cmcf->listen, u.naddrs);
+    ls = ngx_array_push(&cmcf->listen);
     if (ls == NULL) {
         return NGX_CONF_ERROR;
     }
@@ -689,6 +689,10 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     ls->sndbuf = -1;
     ls->type = SOCK_STREAM;
     ls->ctx = cf->ctx;
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+    ls->fastopen = -1;
+#endif
 
 #if (NGX_HAVE_INET6)
     ls->ipv6only = 1;
@@ -705,7 +709,7 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         }
 #endif
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
         if (ngx_strcmp(value[i].data, "default_server") == 0
             || ngx_strcmp(value[i].data, "default") == 0) {
 
@@ -718,6 +722,21 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
             ls->bind = 1;
             continue;
         }
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+        if (ngx_strncmp(value[i].data, "fastopen=", 9) == 0) {
+            ls->fastopen = ngx_atoi(value[i].data + 9, value[i].len - 9);
+            ls->bind = 1;
+
+            if (ls->fastopen == NGX_ERROR) {
+                ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                                   "invalid fastopen \"%V\"", &value[i]);
+                return NGX_CONF_ERROR;
+            }
+
+            continue;
+        }
+#endif
 
         if (ngx_strncmp(value[i].data, "backlog=", 8) == 0) {
             ls->backlog = ngx_atoi(value[i].data + 8, value[i].len - 8);
@@ -945,29 +964,55 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ls->proxy_protocol) {
             return "\"proxy_protocol\" parameter is incompatible with \"udp\"";
         }
+
+#if (NGX_HAVE_TCP_FASTOPEN)
+        if (ls->fastopen != -1) {
+            return "\"fastopen\" parameter is incompatible with \"udp\"";
+        }
+#endif
     }
 
-    als = cmcf->listen.elts;
-
     for (n = 0; n < u.naddrs; n++) {
-        ls[n] = ls[0];
 
-        ls[n].sockaddr = u.addrs[n].sockaddr;
-        ls[n].socklen = u.addrs[n].socklen;
-        ls[n].addr_text = u.addrs[n].name;
-        ls[n].wildcard = ngx_inet_wildcard(ls[n].sockaddr);
+        for (i = 0; i < n; i++) {
+            if (ngx_cmp_sockaddr(u.addrs[n].sockaddr, u.addrs[n].socklen,
+                                 u.addrs[i].sockaddr, u.addrs[i].socklen, 1)
+                == NGX_OK)
+            {
+                goto next;
+            }
+        }
 
-#if (NGX_STREAM_SNI)
+        if (n != 0) {
+            nls = ngx_array_push(&cmcf->listen);
+            if (nls == NULL) {
+                return NGX_CONF_ERROR;
+            }
+
+            *nls = *ls;
+
+        } else {
+            nls = ls;
+        }
+
+        nls->sockaddr = u.addrs[n].sockaddr;
+        nls->socklen = u.addrs[n].socklen;
+        nls->addr_text = u.addrs[n].name;
+        nls->wildcard = ngx_inet_wildcard(nls->sockaddr);
+
+        als = cmcf->listen.elts;
+
+#if (T_NGX_STREAM_SNI)
         continue;
 #endif
 
-        for (i = 0; i < cmcf->listen.nelts - u.naddrs + n; i++) {
-            if (ls[n].type != als[i].type) {
+        for (i = 0; i < cmcf->listen.nelts - 1; i++) {
+            if (nls->type != als[i].type) {
                 continue;
             }
 
             if (ngx_cmp_sockaddr(als[i].sockaddr, als[i].socklen,
-                                 ls[n].sockaddr, ls[n].socklen, 1)
+                                 nls->sockaddr, nls->socklen, 1)
                 != NGX_OK)
             {
                 continue;
@@ -975,9 +1020,12 @@ ngx_stream_core_listen(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                                "duplicate \"%V\" address and port pair",
-                               &ls[n].addr_text);
+                               &nls->addr_text);
             return NGX_CONF_ERROR;
         }
+
+    next:
+        continue;
     }
 
     return NGX_CONF_OK;
@@ -1005,7 +1053,7 @@ ngx_stream_core_resolver(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     return NGX_CONF_OK;
 }
 
-#if (NGX_STREAM_SNI)
+#if (T_NGX_STREAM_SNI)
 static char *
 ngx_stream_core_server_name(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {

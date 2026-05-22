@@ -26,7 +26,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 proxy/)
-	->has_daemon('openssl');
+	->has_daemon('openssl')->plan(40);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -82,7 +82,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -98,8 +98,10 @@ foreach my $name ('localhost') {
 		or die "Can't create certificate for $name: $!\n";
 }
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-$t->plan(40);
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -245,6 +247,8 @@ sub get_body {
 			$got += $chunked ? hex $_ : $_ for $chunked
 				? $body =~ /(\w+)\x0d\x0a?\w+\x0d\x0a?/g
 				: length($body);
+			next if $chunked && !$extra{body_more}
+				&& $buf !~ /^0\x0d\x0a?/m;
 			last if $got >= $len;
 		}
 

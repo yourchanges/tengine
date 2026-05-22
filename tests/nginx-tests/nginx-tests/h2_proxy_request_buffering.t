@@ -25,7 +25,7 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-my $t = Test::Nginx->new()->has(qw/http http_v2 proxy/);
+my $t = Test::Nginx->new()->has(qw/http http_v2 proxy/)->plan(49);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
 
@@ -65,8 +65,10 @@ http {
 
 EOF
 
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
-$t->plan(49);
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 
@@ -240,6 +242,8 @@ sub get_body {
 			$got += $chunked ? hex $_ : $_ for $chunked
 				? $body =~ /(\w+)\x0d\x0a?\w+\x0d\x0a?/g
 				: length($body);
+			next if $chunked && !$extra{body_more}
+				&& $buf !~ /^0\x0d\x0a?/m;
 			last if $got >= $len;
 		}
 

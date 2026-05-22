@@ -20,6 +20,9 @@ typedef struct ngx_http_file_cache_s  ngx_http_file_cache_t;
 typedef struct ngx_http_log_ctx_s     ngx_http_log_ctx_t;
 typedef struct ngx_http_chunked_s     ngx_http_chunked_t;
 typedef struct ngx_http_v2_stream_s   ngx_http_v2_stream_t;
+#if (T_NGX_XQUIC)
+typedef struct ngx_http_v3_stream_s  ngx_http_v3_stream_t;
+#endif
 
 typedef ngx_int_t (*ngx_http_header_handler_pt)(ngx_http_request_t *r,
     ngx_table_elt_t *h, ngx_uint_t offset);
@@ -35,6 +38,9 @@ typedef u_char *(*ngx_http_log_handler_pt)(ngx_http_request_t *r,
 #include <ngx_http_upstream_round_robin.h>
 #include <ngx_http_core_module.h>
 
+#if (T_NGX_XQUIC)
+#include <ngx_http_xquic.h>
+#endif
 #if (NGX_HTTP_V2)
 #include <ngx_http_v2.h>
 #endif
@@ -92,6 +98,9 @@ int ngx_http_ssl_servername(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
 int ngx_http_ssl_certificate(ngx_ssl_conn_t *ssl_conn, void *arg);
 #endif
 
+#if defined(T_INGRESS_SHARED_MEMORY_PB) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+int ngx_http_ssl_client_hello_callback(ngx_ssl_conn_t *ssl_conn, int *ad, void *arg);
+#endif
 
 ngx_int_t ngx_http_parse_request_line(ngx_http_request_t *r, ngx_buf_t *b);
 ngx_int_t ngx_http_parse_uri(ngx_http_request_t *r);
@@ -103,10 +112,10 @@ ngx_int_t ngx_http_parse_unsafe_uri(ngx_http_request_t *r, ngx_str_t *uri,
     ngx_str_t *args, ngx_uint_t *flags);
 ngx_int_t ngx_http_parse_header_line(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_uint_t allow_underscores);
-ngx_int_t ngx_http_parse_multi_header_lines(ngx_array_t *headers,
-    ngx_str_t *name, ngx_str_t *value);
-ngx_int_t ngx_http_parse_set_cookie_lines(ngx_array_t *headers,
-    ngx_str_t *name, ngx_str_t *value);
+ngx_table_elt_t *ngx_http_parse_multi_header_lines(ngx_http_request_t *r,
+    ngx_table_elt_t *headers, ngx_str_t *name, ngx_str_t *value);
+ngx_table_elt_t *ngx_http_parse_set_cookie_lines(ngx_http_request_t *r,
+    ngx_table_elt_t *headers, ngx_str_t *name, ngx_str_t *value);
 ngx_int_t ngx_http_arg(ngx_http_request_t *r, u_char *name, size_t len,
     ngx_str_t *value);
 void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
@@ -114,6 +123,12 @@ void ngx_http_split_args(ngx_http_request_t *r, ngx_str_t *uri,
 ngx_int_t ngx_http_parse_chunked(ngx_http_request_t *r, ngx_buf_t *b,
     ngx_http_chunked_t *ctx);
 
+#if (T_HTTP_HEADER)
+ngx_int_t ngx_http_header_in(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value);
+ngx_int_t ngx_http_header_out(ngx_http_request_t *r, u_char *name, size_t len,
+    ngx_str_t *value);
+#endif
 
 ngx_http_request_t *ngx_http_create_request(ngx_connection_t *c);
 ngx_int_t ngx_http_process_request_uri(ngx_http_request_t *r);
@@ -167,6 +182,14 @@ ngx_uint_t  ngx_http_degraded(ngx_http_request_t *);
 #endif
 
 
+#if (NGX_HTTP_V2)
+ngx_int_t ngx_http_huff_decode(u_char *state, u_char *src, size_t len,
+    u_char **dst, ngx_uint_t last, ngx_log_t *log);
+size_t ngx_http_huff_encode(u_char *src, size_t len, u_char *dst,
+    ngx_uint_t lower);
+#endif
+
+
 extern ngx_module_t  ngx_http_module;
 
 extern ngx_str_t  ngx_http_html_default_types[];
@@ -179,6 +202,5 @@ extern ngx_http_request_body_filter_pt   ngx_http_top_request_body_filter;
 #if (T_NGX_INPUT_BODY_FILTER)
 extern ngx_http_input_body_filter_pt     ngx_http_top_input_body_filter;
 #endif
-
 
 #endif /* _NGX_HTTP_H_INCLUDED_ */

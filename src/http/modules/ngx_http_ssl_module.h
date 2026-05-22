@@ -25,6 +25,7 @@ typedef struct {
 
     ngx_flag_t                      prefer_server_ciphers;
     ngx_flag_t                      early_data;
+    ngx_flag_t                      reject_handshake;
 
     ngx_uint_t                      protocols;
 
@@ -52,11 +53,16 @@ typedef struct {
     ngx_str_t                       ciphers;
 
     ngx_array_t                    *passwords;
+    ngx_array_t                    *conf_commands;
 
     ngx_shm_zone_t                 *shm_zone;
 
     ngx_flag_t                      session_tickets;
     ngx_array_t                    *session_ticket_keys;
+
+    ngx_uint_t                      ocsp;
+    ngx_str_t                       ocsp_responder;
+    ngx_shm_zone_t                 *ocsp_cache_zone;
 
     ngx_flag_t                      stapling;
     ngx_flag_t                      stapling_verify;
@@ -65,6 +71,14 @@ typedef struct {
 
     u_char                         *file;
     ngx_uint_t                      line;
+
+#if (T_NGX_SSL_NTLS)
+    ngx_flag_t                      enable_ntls;
+    ngx_str_t                       enc_certificate;
+    ngx_str_t                       enc_certificate_key;
+    ngx_str_t                       sign_certificate;
+    ngx_str_t                       sign_certificate_key;
+#endif
 } ngx_http_ssl_srv_conf_t;
 
 #if (T_NGX_HTTP_SSL_VCE)

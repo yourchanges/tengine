@@ -15,7 +15,6 @@ BEGIN { use FindBin; chdir($FindBin::Bin); }
 
 use lib 'lib';
 use Test::Nginx;
-eval { require Net::DNS::Nameserver; };
 plan(skip_all => 'Net::DNS::Nameserver not installed') if $@;
 
 ###############################################################################
@@ -24,7 +23,7 @@ select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
 my $t = Test::Nginx->new()->has(qw/http proxy/)->plan(6);
-my @server_addrs = ("127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4");
+my @server_addrs = ("127.0.0.1", "127.0.0.2");
 my @domain_addrs = ("127.0.0.2");
 
 my $ipv6 = $t->has_version('1.11.5') ? "ipv6=off" : "";
@@ -49,7 +48,7 @@ http {
         vnswrr;
         server www.taobao.com fail_timeout=0s;
 
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.01:8081 backup;
     }
 
     upstream backend1 {
@@ -57,7 +56,7 @@ http {
         dynamic_resolve;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.01:8081 backup;
     }
 
     upstream backend2 {
@@ -72,7 +71,7 @@ http {
         dynamic_resolve fallback=next;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.01:8081 backup;
     }
 
     upstream backend4 {
@@ -80,7 +79,7 @@ http {
         dynamic_resolve fallback=shutdown;
 
         server www.taobao.com:8081 fail_timeout=0s;
-        server 127.0.0.4:8081 backup;
+        server 127.0.0.01:8081 backup;
     }
 
     upstream backend-ka {
@@ -139,7 +138,7 @@ $t->run();
 
 ###############################################################################
 
-unlike(http_get('/static'), qr/127.0.0.4/,
+unlike(http_get('/static'), qr/127.0.0.1/,
     'static resolved should be taobao\' IP addr');
 like(http_get('/'), qr/127\.0\.0\.2/,
     'http server should be 127.0.0.2');
@@ -153,7 +152,7 @@ kill $^O eq 'MSWin32' ? 9 : 'TERM', $dns_pid;
 wait;
 
 # wait for dns cache to expire
-sleep(2);
+sleep(3);
 
 unlike(http_get('/stale'), qr/127\.0\.0\.2/,
     'stale http server should be www.taobao.com:8081, using initial result');
@@ -161,7 +160,7 @@ unlike(http_get('/stale'), qr/127\.0\.0\.2/,
 like(http_get('/shutdown'), qr/502 Bad Gateway/,
     'shutdown connection if dns query is failed');
 
-like(http_get('/next'), qr/127\.0\.0\.4/, 'next upstream should be 127.0.0.4');
+like(http_get('/next'), qr/127\.0\.0\.1/, 'next upstream should be 127.0.0.1');
 
 ###############################################################################
 
@@ -248,6 +247,8 @@ sub reply_handler {
 }
 
 sub dns_server_daemon {
+    eval { require Net::DNS::Nameserver; };
+
     my $ns = new Net::DNS::Nameserver(
         LocalAddr    => '127.0.0.1',
         LocalPort    => 53530,
@@ -255,7 +256,7 @@ sub dns_server_daemon {
         Verbose      => 0
     ) or die "couldn't create nameserver object\n";
 
-    $ns->main_loop;
+    $ns->start_server(1);
 }
 
 ###############################################################################

@@ -110,7 +110,7 @@ typedef struct {
     time_t                           fail_timeout;
     ngx_msec_t                       slow_start;
     ngx_uint_t                       down;
-#if (T_NGX_HTTP_UPSTREAM_ID)    
+#if (T_NGX_HTTP_UPSTREAM_ID)
     ngx_str_t                        id;
 #endif
 
@@ -181,7 +181,6 @@ typedef struct {
     ngx_msec_t                       connect_timeout;
     ngx_msec_t                       send_timeout;
     ngx_msec_t                       read_timeout;
-    ngx_msec_t                       timeout;
     ngx_msec_t                       next_upstream_timeout;
 
     size_t                           send_lowat;
@@ -264,6 +263,23 @@ typedef struct {
     ngx_http_complex_value_t        *ssl_name;
     ngx_flag_t                       ssl_server_name;
     ngx_flag_t                       ssl_verify;
+
+    ngx_http_complex_value_t        *ssl_certificate;
+    ngx_http_complex_value_t        *ssl_certificate_key;
+    ngx_array_t                     *ssl_passwords;
+
+#if (T_NGX_SSL_NTLS)
+    ngx_str_t                        enc_certificate;
+    ngx_str_t                        enc_certificate_key;
+    ngx_str_t                        sign_certificate;
+    ngx_str_t                        sign_certificate_key;
+#endif
+#endif
+
+#if (T_NGX_SSL_NTLS)
+    ngx_str_t                        ssl_ciphers;
+    const SSL_METHOD                *tls_method;
+    ngx_http_complex_value_t        *enable_ntls;
 #endif
 
     ngx_str_t                        module;
@@ -306,23 +322,21 @@ typedef struct {
 
     ngx_table_elt_t                 *last_modified;
     ngx_table_elt_t                 *location;
-    ngx_table_elt_t                 *accept_ranges;
+    ngx_table_elt_t                 *refresh;
     ngx_table_elt_t                 *www_authenticate;
     ngx_table_elt_t                 *transfer_encoding;
     ngx_table_elt_t                 *vary;
 
-#if (NGX_HTTP_GZIP)
-    ngx_table_elt_t                 *content_encoding;
-#endif
-
-    ngx_array_t                      cache_control;
-    ngx_array_t                      cookies;
+    ngx_table_elt_t                 *cache_control;
+    ngx_table_elt_t                 *set_cookie;
 
     off_t                            content_length_n;
     time_t                           last_modified_time;
 
     unsigned                         connection_close:1;
     unsigned                         chunked:1;
+    unsigned                         no_cache:1;
+    unsigned                         expired:1;
 } ngx_http_upstream_headers_in_t;
 
 
@@ -424,6 +438,7 @@ struct ngx_http_upstream_s {
     unsigned                         buffering:1;
     unsigned                         keepalive:1;
     unsigned                         upgrade:1;
+    unsigned                         error:1;
 
     unsigned                         request_sent:1;
     unsigned                         request_body_sent:1;
@@ -455,6 +470,8 @@ typedef struct {
 
 ngx_int_t ngx_http_upstream_create(ngx_http_request_t *r);
 void ngx_http_upstream_init(ngx_http_request_t *r);
+ngx_int_t ngx_http_upstream_non_buffered_filter_init(void *data);
+ngx_int_t ngx_http_upstream_non_buffered_filter(void *data, ssize_t bytes);
 ngx_http_upstream_srv_conf_t *ngx_http_upstream_add(ngx_conf_t *cf,
     ngx_url_t *u, ngx_uint_t flags);
 char *ngx_http_upstream_bind_set_slot(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -485,6 +502,12 @@ ngx_uint_t ngx_http_upstream_check_add_dynamic_peer(ngx_pool_t *pool,
 void ngx_http_upstream_check_delete_dynamic_peer(ngx_str_t *name,
      ngx_addr_t *peer_addr);
 
+#endif
+
+#if (NGX_HTTP_UPSTREAM_RBTREE)
+ngx_http_upstream_srv_conf_t *
+ngx_http_upstream_rbtree_lookup(ngx_http_upstream_main_conf_t *umcf,
+    ngx_str_t *host);
 #endif
 
 extern ngx_module_t        ngx_http_upstream_module;

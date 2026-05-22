@@ -57,7 +57,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
@@ -74,7 +74,10 @@ foreach my $name ('localhost') {
 }
 
 $t->write_file('index.html', '');
+# suppress deprecation warning
+open OLDERR, ">&", \*STDERR; close STDERR;
 $t->run();
+open STDERR, ">&", \*OLDERR;
 
 ###############################################################################
 

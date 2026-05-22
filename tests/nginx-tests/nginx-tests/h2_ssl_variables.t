@@ -23,12 +23,8 @@ use Test::Nginx::HTTP2;
 select STDERR; $| = 1;
 select STDOUT; $| = 1;
 
-eval { require IO::Socket::SSL; };
-plan(skip_all => 'IO::Socket::SSL not installed') if $@;
-eval { IO::Socket::SSL::SSL_VERIFY_NONE(); };
-plan(skip_all => 'IO::Socket::SSL too old') if $@;
 
-my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 rewrite/)
+my $t = Test::Nginx->new()->has(qw/http http_ssl http_v2 rewrite socket_ssl/)
 	->has_daemon('openssl')->plan(8);
 
 $t->write_file_expand('nginx.conf', <<'EOF');
@@ -69,7 +65,7 @@ EOF
 
 $t->write_file('openssl.conf', <<EOF);
 [ req ]
-default_bits = 1024
+default_bits = 2048
 encrypt_key = no
 distinguished_name = req_distinguished_name
 [ req_distinguished_name ]
